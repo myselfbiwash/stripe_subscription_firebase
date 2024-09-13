@@ -17,6 +17,7 @@ const Success = () => {
           const user = snapshot.val();
           if(user){
             setSessionId(user.subscription.sessionId || "")
+            console.log("Session ID after retrieving it from Firebase which is after completion of checkout", user.subscription.sessionId)
           }
         })
       }
@@ -24,7 +25,7 @@ const Success = () => {
 
   }, [userId, sessionId]);
 
-  console.log(sessionId)
+  console.log("Session ID outside useEffect", sessionId)
 
   const handlePaymentSuccess = () => {
     fetch("http://localhost:5000/api/v1/payment-success", {
@@ -35,15 +36,24 @@ const Success = () => {
       body: JSON.stringify({sessionId: sessionId, firebaseId: userId})
     })
     .then(res => {
+      console.log("Payment Success Response",res);
       if(res.ok) return res.json();
       return res.json().then(json => Promise.reject(json));
     })
     .then(data => {
-      console.log(data.message);
-      navigate("/")
+      if (data) {
+        console.log("Success",data);
+       
+        navigate('/');
+        // navigate("/cancel")
+      } else {
+        console.log(data);
+        alert("Failure", data.message);
+        navigate('/');
+      }
     })
     .catch(e => {
-      console.log(e.error);
+      console.log(e.message);
     });
   }
 

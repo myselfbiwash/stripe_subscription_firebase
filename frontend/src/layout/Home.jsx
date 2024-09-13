@@ -9,36 +9,58 @@ const data = [
     id: 1,
     src: basic,
     title: "Basic",
-    price: "99",
+    price: 40,
   },
   {
     id: 2,
     src: pro,
     title: "Pro",
-    price: "499",
+    price: 250,
   },
   {
     id: 3,
     src: business,
     title: "Business",
-    price: "999",
+    price: 500,
   },
 ];
 const Home = () => {
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
   const [planType, setPlanType] = useState("");
+  const [stripeCustomerId, setStripeCustomerId] = useState("");
+  const [stripeSubscriptionId, setStripeSubscriptionId] = useState("");
+  const [email, setEmail] = useState("");
+  const [sessionId, setSessionId] = useState("");
+
 
   useEffect(() => {
     firebase.auth().onAuthStateChanged((user) => {
       if (user) {
+        console.log("User", user);
         setUserId(user.uid);
+        console.log("User ID", user.uid);
         setUserName(user.displayName);
+        setEmail(user.email);
+        setStripeSubscriptionId(user.stripeSubscriptionId);
+        console.log("User Email",user.email);
         const userRef = firebase.database().ref("users/" + user.uid);
         userRef.on("value", (snapshot) => {
           const user = snapshot.val();
-          if (user) {
+          if (user && user.subscription) {
             setPlanType(user.subscription.planType || "");
+            setStripeCustomerId(user.stripeCustomerId || "");
+            setSessionId(user.subscription.sessionId || "")
+            setStripeSubscriptionId(user.stripeSubscriptionId )
+            console.log("Stripe Subscription ID",user.stripeSubscriptionId);
+
+
+
+            console.log("Stripe Customer ID", user.stripeCustomerId);
+
+            console.log("User Subscription",user.subscription);
+            console.log("User Subscription Type",user.subscription.planType);
+            console.log("User Session ID",user.subscription.sessionId);
           }
         });
       } else {
@@ -55,20 +77,79 @@ const Home = () => {
         "Content-Type": "application/json",
       },
       mode: "cors",
-      body: JSON.stringify({ plan: plan, customerId: userId }),
+      body: JSON.stringify({ plan: plan, firebaseId: userId, email: email }),
     })
       .then((res) => {
         if (res.ok) return res.json();
-        console.log(res);
+        console.log("Response is: ",res);
         return res.json().then((json) => Promise.reject(json));
       })
       .then(({ session }) => {
+        console.log("Session id in Home is:", session.subscription);
         window.location = session.url;
       })
       .catch((e) => {
-        console.log(e.error);
+        console.log("Error:",e.message);
       });
   };
+
+  // handleManageSubscription function
+
+  const handleManageSubscription = () => {
+    console.log("Stripe Subscription ID ...............: ",stripeSubscriptionId);
+    fetch("http://localhost:5000/api/v1/create-billing-portal-session",{
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      mode: "cors",
+      body: JSON.stringify({ customerId: stripeCustomerId, stripeSubscriptionId: stripeSubscriptionId, sessionId: sessionId, email: email }),
+    })
+      .then((res) => {
+        if (res.ok) return res.json();
+        console.log("Response is: ",res);
+        return res.json().then((json) => Promise.reject(json));
+      })
+      .then(({ url }) => {
+        console.log("url is: ",url);
+        window.location = url;
+      })
+      .catch((e) => {
+        console.log("Error:",e.message);
+      });
+
+    // window.open( 'https://billing.stripe.com/p/login/test_8wMaGj177dec6RidQQ', '_blank');
+
+    }
+
+    const handleManageSubscriptionPortal = () => {
+      // fetch("http://localhost:5000/api/v1/create-billing-portal-session",{
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   mode: "cors",
+      //   body: JSON.stringify({ customerId: stripeCustomerId }),
+      // })
+      //   .then((res) => {
+      //     if (res.ok) return res.json();
+      //     console.log(res);
+      //     return res.json().then((json) => Promise.reject(json));
+      //   })
+      //   .then(({ url }) => {
+      //     console.log("url is: ",url);
+      //     window.location = url;
+      //   })
+      //   .catch((e) => {
+      //     console.log("Error:",e.message);
+      //   });
+
+
+      window.location = 'https://billing.stripe.com/p/login/test_8wMaGj177dec6RidQQ'
+      }
+  
+
+
 
   return (
     <>
@@ -125,26 +206,29 @@ const Home = () => {
                 reprehenderit repudiandae debitis tenetur?
               </p>
               <div className="text-4xl text-center font-bold py-4">
-                ₹{item.price}
+                ${item.price}
               </div>
               <div className="mx-auto flex justify-center items-center my-3">
                 {planType === item.title.toLowerCase() ? (
-                  <button className="bg-green-600 text-white rounded-md text-base uppercase w-auto py-2 px-4 font-bold">
-                    Subscribed
+                  <button onClick={() => handleManageSubscription()} className="bg-green-600 text-white rounded-md text-base uppercase w-auto py-2 px-4 font-bold">
+                    Manage Subscription 
                   </button>
-                ) : (
+                )
+                
+                : (
                   <button
-                    onClick={() => checkout(Number(item.price))}
-                    className="bg-[#3d5fc4] text-white rounded-md text-base uppercase w-24 py-2 font-bold"
-                  >
-                    Start
-                  </button>
+                  onClick={() => planType ? handleManageSubscription() : checkout(Number(item.price))}
+                  className="bg-[#3d5fc4] text-white rounded-md text-base uppercase px-4 py-2 font-bold"
+                >
+                  {planType ? "Manage Subscription" : "Start"}
+                </button>
                 )}
               </div>
             </div>
           ))}
         </div>
       </div>
+  <button onClick={handleManageSubscriptionPortal} >Manage Billing</button>
     </>
   );
 };
